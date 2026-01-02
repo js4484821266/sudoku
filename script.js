@@ -65,8 +65,12 @@ class SudokuGame {
         for (let row = 0; row < 9; row++) {
             for (let col = 0; col < 9; col++) {
                 if (board[row][col] === 0) {
-                    // Shuffle numbers for randomness
-                    const shuffled = numbers.sort(() => Math.random() - 0.5);
+                    // Fisher-Yates shuffle for proper randomization
+                    const shuffled = [...numbers];
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
                     
                     for (let num of shuffled) {
                         if (this.isValid(board, row, col, num)) {

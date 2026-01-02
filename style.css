@@ -134,6 +134,8 @@ select {
     border-right: 2px solid #333;
 }
 
+/* Add bold bottom borders after rows 3 and 6 to create 3x3 boxes
+   Row 3 ends at cell 27 (cells 19-27), Row 6 ends at cell 54 (cells 46-54) */
 .cell:nth-child(n+19):nth-child(-n+27),
 .cell:nth-child(n+46):nth-child(-n+54) {
     border-bottom: 2px solid #333;
