@@ -13,6 +13,8 @@
             <button id="newGame">New Game</button>
             <button id="checkSolution">Check Solution</button>
             <button id="solve">Solve</button>
+            <button id="undoBtn">Undo</button>
+            <button id="memoToggle">Mode: Normal</button>
             <select id="difficulty">
                 <option value="easy">Easy</option>
                 <option value="medium" selected>Medium</option>
@@ -20,7 +22,24 @@
             </select>
         </div>
         <div id="message"></div>
-        <div id="sudoku-board"></div>
+        <div class="game-area">
+            <div id="sudoku-board"></div>
+            <div class="number-pad">
+                <div class="number-pad-title">Number Pad</div>
+                <div class="number-grid">
+                    <button id="num1" class="num-btn">1</button>
+                    <button id="num2" class="num-btn">2</button>
+                    <button id="num3" class="num-btn">3</button>
+                    <button id="num4" class="num-btn">4</button>
+                    <button id="num5" class="num-btn">5</button>
+                    <button id="num6" class="num-btn">6</button>
+                    <button id="num7" class="num-btn">7</button>
+                    <button id="num8" class="num-btn">8</button>
+                    <button id="num9" class="num-btn">9</button>
+                </div>
+                <button id="clearBtn" class="clear-btn">Clear</button>
+            </div>
+        </div>
     </div>
     <script src="script.js"></script>
 </body>

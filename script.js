@@ -4,8 +4,17 @@ class SudokuGame {
         this.board = Array(9).fill(null).map(() => Array(9).fill(0));
         this.solution = Array(9).fill(null).map(() => Array(9).fill(0));
         this.prefilled = Array(9).fill(null).map(() => Array(9).fill(false));
+        this.memos = this.initializeMemos();
         this.difficulty = 'medium';
+        this.selectedCell = null;
+        this.memoMode = false;
+        this.history = [];
+        this.maxHistory = 50;
         this.init();
+    }
+
+    initializeMemos() {
+        return Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
     }
 
     init() {
@@ -20,10 +29,21 @@ class SudokuGame {
         document.getElementById('difficulty').addEventListener('change', (e) => {
             this.difficulty = e.target.value;
         });
+        document.getElementById('undoBtn').addEventListener('click', () => this.undo());
+        document.getElementById('memoToggle').addEventListener('click', () => this.toggleMemoMode());
+        
+        // Number pad event listeners
+        for (let i = 1; i <= 9; i++) {
+            document.getElementById(`num${i}`).addEventListener('click', () => this.inputNumber(i));
+        }
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearCell());
     }
 
     newGame() {
         this.generateSudoku();
+        this.memos = this.initializeMemos();
+        this.selectedCell = null;
+        this.history = [];
         this.renderBoard();
         this.showMessage('');
     }
@@ -122,50 +142,179 @@ class SudokuGame {
             for (let col = 0; col < 9; col++) {
                 const cell = document.createElement('div');
                 cell.className = 'cell';
+                cell.dataset.row = row;
+                cell.dataset.col = col;
                 
                 if (this.prefilled[row][col]) {
                     cell.classList.add('prefilled');
                 }
                 
-                const input = document.createElement('input');
-                input.type = 'text';
-                input.maxLength = 1;
-                input.dataset.row = row;
-                input.dataset.col = col;
+                // Add click handler for cell selection
+                cell.addEventListener('click', () => this.selectCell(row, col));
                 
+                // Render main number or memo numbers
                 if (this.board[row][col] !== 0) {
-                    input.value = this.board[row][col];
+                    const mainNumber = document.createElement('div');
+                    mainNumber.className = 'main-number';
+                    mainNumber.textContent = this.board[row][col];
+                    cell.appendChild(mainNumber);
+                } else if (this.memos[row][col].size > 0) {
+                    const memoContainer = document.createElement('div');
+                    memoContainer.className = 'memo-container';
+                    for (let i = 1; i <= 9; i++) {
+                        const memoCell = document.createElement('div');
+                        memoCell.className = 'memo-cell';
+                        if (this.memos[row][col].has(i)) {
+                            memoCell.textContent = i;
+                        }
+                        memoContainer.appendChild(memoCell);
+                    }
+                    cell.appendChild(memoContainer);
                 }
                 
-                if (this.prefilled[row][col]) {
-                    input.readOnly = true;
-                }
-                
-                input.addEventListener('input', (e) => this.handleInput(e));
-                
-                cell.appendChild(input);
                 boardElement.appendChild(cell);
+            }
+        }
+        
+        // Highlight selected cell
+        if (this.selectedCell) {
+            const selectedElement = document.querySelector(
+                `.cell[data-row="${this.selectedCell.row}"][data-col="${this.selectedCell.col}"]`
+            );
+            if (selectedElement) {
+                selectedElement.classList.add('selected');
             }
         }
     }
 
-    handleInput(e) {
-        const input = e.target;
-        const value = input.value;
-        
-        // Only allow numbers 1-9
-        if (value && (!/^[1-9]$/.test(value))) {
-            input.value = '';
+    selectCell(row, col) {
+        // Don't allow selecting prefilled cells
+        if (this.prefilled[row][col]) {
             return;
         }
         
-        const row = parseInt(input.dataset.row);
-        const col = parseInt(input.dataset.col);
+        this.selectedCell = { row, col };
+        this.renderBoard();
+    }
+
+    inputNumber(num) {
+        if (!this.selectedCell) {
+            this.showMessage('Please select a cell first', 'error');
+            return;
+        }
         
-        this.board[row][col] = value ? parseInt(value) : 0;
+        const { row, col } = this.selectedCell;
         
-        // Remove any previous error/correct highlighting
-        input.parentElement.classList.remove('error', 'correct');
+        if (this.prefilled[row][col]) {
+            return;
+        }
+        
+        if (this.memoMode) {
+            // Toggle memo number
+            this.addToHistory('memo', row, col, new Set(this.memos[row][col]), this.board[row][col]);
+            
+            if (this.memos[row][col].has(num)) {
+                this.memos[row][col].delete(num);
+            } else {
+                this.memos[row][col].add(num);
+            }
+        } else {
+            // Regular number input
+            this.addToHistory('number', row, col, new Set(this.memos[row][col]), this.board[row][col]);
+            
+            this.board[row][col] = num;
+            this.memos[row][col].clear();
+            
+            // Instant validation
+            if (this.solution[row][col] === num) {
+                // Correct! Auto-clear memos
+                this.autoClearMemos(row, col, num);
+                this.showMessage('Correct!', 'success');
+            } else {
+                this.showMessage('Incorrect - try again', 'error');
+            }
+        }
+        
+        this.renderBoard();
+    }
+
+    clearCell() {
+        if (!this.selectedCell) {
+            this.showMessage('Please select a cell first', 'error');
+            return;
+        }
+        
+        const { row, col } = this.selectedCell;
+        
+        if (this.prefilled[row][col]) {
+            return;
+        }
+        
+        this.addToHistory('clear', row, col, new Set(this.memos[row][col]), this.board[row][col]);
+        
+        this.board[row][col] = 0;
+        this.memos[row][col].clear();
+        this.renderBoard();
+    }
+
+    toggleMemoMode() {
+        this.memoMode = !this.memoMode;
+        const button = document.getElementById('memoToggle');
+        button.textContent = this.memoMode ? 'Mode: Memo' : 'Mode: Normal';
+        button.classList.toggle('active', this.memoMode);
+    }
+
+    addToHistory(action, row, col, memosCopy, previousValue) {
+        this.history.push({
+            action,
+            row,
+            col,
+            memos: memosCopy,
+            value: previousValue
+        });
+        
+        // Keep only last maxHistory entries
+        if (this.history.length > this.maxHistory) {
+            this.history.shift();
+        }
+    }
+
+    undo() {
+        if (this.history.length === 0) {
+            this.showMessage('Nothing to undo', 'error');
+            return;
+        }
+        
+        const lastAction = this.history.pop();
+        const { row, col, memos, value } = lastAction;
+        
+        this.board[row][col] = value;
+        this.memos[row][col] = memos;
+        
+        this.renderBoard();
+        this.showMessage('Undo successful', 'success');
+    }
+
+    autoClearMemos(row, col, num) {
+        // Clear memo from same row
+        for (let c = 0; c < 9; c++) {
+            this.memos[row][c].delete(num);
+        }
+        
+        // Clear memo from same column
+        for (let r = 0; r < 9; r++) {
+            this.memos[r][col].delete(num);
+        }
+        
+        // Clear memo from same 3x3 box
+        const boxRow = Math.floor(row / 3) * 3;
+        const boxCol = Math.floor(col / 3) * 3;
+        
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                this.memos[boxRow + i][boxCol + j].delete(num);
+            }
+        }
     }
 
     checkSolution() {
@@ -179,7 +328,7 @@ class SudokuGame {
         
         for (let row = 0; row < 9; row++) {
             for (let col = 0; col < 9; col++) {
-                const cell = document.querySelector(`input[data-row="${row}"][data-col="${col}"]`).parentElement;
+                const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
                 
                 if (this.board[row][col] === 0) {
                     isComplete = false;
