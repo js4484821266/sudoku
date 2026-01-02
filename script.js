@@ -4,13 +4,17 @@ class SudokuGame {
         this.board = Array(9).fill(null).map(() => Array(9).fill(0));
         this.solution = Array(9).fill(null).map(() => Array(9).fill(0));
         this.prefilled = Array(9).fill(null).map(() => Array(9).fill(false));
-        this.memos = Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
+        this.memos = this.initializeMemos();
         this.difficulty = 'medium';
         this.selectedCell = null;
         this.memoMode = false;
         this.history = [];
         this.maxHistory = 50;
         this.init();
+    }
+
+    initializeMemos() {
+        return Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
     }
 
     init() {
@@ -37,7 +41,7 @@ class SudokuGame {
 
     newGame() {
         this.generateSudoku();
-        this.memos = Array(9).fill(null).map(() => Array(9).fill(null).map(() => new Set()));
+        this.memos = this.initializeMemos();
         this.selectedCell = null;
         this.history = [];
         this.renderBoard();
@@ -181,25 +185,6 @@ class SudokuGame {
                 selectedElement.classList.add('selected');
             }
         }
-    }
-
-    handleInput(e) {
-        const input = e.target;
-        const value = input.value;
-        
-        // Only allow numbers 1-9
-        if (value && (!/^[1-9]$/.test(value))) {
-            input.value = '';
-            return;
-        }
-        
-        const row = parseInt(input.dataset.row);
-        const col = parseInt(input.dataset.col);
-        
-        this.board[row][col] = value ? parseInt(value) : 0;
-        
-        // Remove any previous error/correct highlighting
-        input.parentElement.classList.remove('error', 'correct');
     }
 
     selectCell(row, col) {
