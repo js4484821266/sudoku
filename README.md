@@ -1,2 +1,2 @@
 # sudoku
-A sudoku web app solely for me.
+A Sudoku web app solely for me with Copilot.
