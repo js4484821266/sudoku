@@ -319,24 +319,106 @@ class SudokuGame {
 
     checkSolution() {
         let isComplete = true;
-        let isCorrect = true;
+        let hasErrors = false;
+        const errorCells = new Set();
         
         // Clear previous highlighting
         document.querySelectorAll('.cell').forEach(cell => {
             cell.classList.remove('error', 'correct');
         });
         
+        // First check if puzzle is complete
+        for (let row = 0; row < 9; row++) {
+            for (let col = 0; col < 9; col++) {
+                if (this.board[row][col] === 0) {
+                    isComplete = false;
+                }
+            }
+        }
+        
+        if (!isComplete) {
+            this.showMessage('Puzzle is not complete yet!', 'error');
+            return;
+        }
+        
+        // Check for duplicates in rows
+        for (let row = 0; row < 9; row++) {
+            const seen = new Set();
+            for (let col = 0; col < 9; col++) {
+                const num = this.board[row][col];
+                if (seen.has(num)) {
+                    hasErrors = true;
+                    errorCells.add(`${row}-${col}`);
+                    // Also mark the first occurrence
+                    for (let c = 0; c < col; c++) {
+                        if (this.board[row][c] === num) {
+                            errorCells.add(`${row}-${c}`);
+                        }
+                    }
+                } else {
+                    seen.add(num);
+                }
+            }
+        }
+        
+        // Check for duplicates in columns
+        for (let col = 0; col < 9; col++) {
+            const seen = new Set();
+            for (let row = 0; row < 9; row++) {
+                const num = this.board[row][col];
+                if (seen.has(num)) {
+                    hasErrors = true;
+                    errorCells.add(`${row}-${col}`);
+                    // Also mark the first occurrence
+                    for (let r = 0; r < row; r++) {
+                        if (this.board[r][col] === num) {
+                            errorCells.add(`${r}-${col}`);
+                        }
+                    }
+                } else {
+                    seen.add(num);
+                }
+            }
+        }
+        
+        // Check for duplicates in 3x3 boxes
+        for (let boxRow = 0; boxRow < 3; boxRow++) {
+            for (let boxCol = 0; boxCol < 3; boxCol++) {
+                const seen = new Set();
+                const cellsInBox = [];
+                
+                for (let i = 0; i < 3; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        const row = boxRow * 3 + i;
+                        const col = boxCol * 3 + j;
+                        const num = this.board[row][col];
+                        
+                        if (seen.has(num)) {
+                            hasErrors = true;
+                            errorCells.add(`${row}-${col}`);
+                            // Also mark the first occurrence in this box
+                            for (let cell of cellsInBox) {
+                                if (this.board[cell.row][cell.col] === num) {
+                                    errorCells.add(`${cell.row}-${cell.col}`);
+                                }
+                            }
+                        } else {
+                            seen.add(num);
+                        }
+                        
+                        cellsInBox.push({ row, col });
+                    }
+                }
+            }
+        }
+        
+        // Apply highlighting
         for (let row = 0; row < 9; row++) {
             for (let col = 0; col < 9; col++) {
                 const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                const cellKey = `${row}-${col}`;
                 
-                if (this.board[row][col] === 0) {
-                    isComplete = false;
-                    continue;
-                }
-                
-                if (this.board[row][col] !== this.solution[row][col]) {
-                    isCorrect = false;
+                if (errorCells.has(cellKey)) {
                     if (!this.prefilled[row][col]) {
                         cell.classList.add('error');
                     }
@@ -346,12 +428,11 @@ class SudokuGame {
             }
         }
         
-        if (!isComplete) {
-            this.showMessage('Puzzle is not complete yet!', 'error');
-        } else if (isCorrect) {
-            this.showMessage('🎉 Congratulations! You solved it!', 'success');
-        } else {
+        // Show appropriate message
+        if (hasErrors) {
             this.showMessage('Some numbers are incorrect. Try again!', 'error');
+        } else {
+            this.showMessage('🎉 Congratulations! You solved it!', 'success');
         }
     }
 
