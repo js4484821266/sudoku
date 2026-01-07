@@ -1,78 +1,3 @@
-// Confetti Animation
-class ConfettiEffect {
-    constructor() {
-        this.canvas = document.getElementById('confetti-canvas');
-        this.ctx = this.canvas.getContext('2d');
-        this.particles = [];
-        this.animationId = null;
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-    }
-
-    resize() {
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
-    }
-
-    createParticle() {
-        const colors = ['#667eea', '#764ba2', '#f093fb', '#10b981', '#f59e0b', '#ef4444'];
-        return {
-            x: Math.random() * this.canvas.width,
-            y: -10,
-            size: Math.random() * 8 + 4,
-            speedY: Math.random() * 3 + 2,
-            speedX: Math.random() * 2 - 1,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            rotation: Math.random() * 360,
-            rotationSpeed: Math.random() * 10 - 5
-        };
-    }
-
-    launch() {
-        this.particles = [];
-        const numParticles = 150;
-        for (let i = 0; i < numParticles; i++) {
-            setTimeout(() => {
-                this.particles.push(this.createParticle());
-            }, i * 10);
-        }
-        this.animate();
-    }
-
-    animate() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        this.particles.forEach((particle, index) => {
-            particle.y += particle.speedY;
-            particle.x += particle.speedX;
-            particle.rotation += particle.rotationSpeed;
-            
-            this.ctx.save();
-            this.ctx.translate(particle.x, particle.y);
-            this.ctx.rotate((particle.rotation * Math.PI) / 180);
-            this.ctx.fillStyle = particle.color;
-            this.ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
-            this.ctx.restore();
-            
-            if (particle.y > this.canvas.height) {
-                this.particles.splice(index, 1);
-            }
-        });
-        
-        if (this.particles.length > 0) {
-            this.animationId = requestAnimationFrame(() => this.animate());
-        }
-    }
-
-    stop() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.particles = [];
-        }
-    }
-}
-
 // Statistics Manager
 class StatsManager {
     constructor() {
@@ -145,7 +70,6 @@ class SudokuGame {
         this.elapsedTime = 0;
         this.gameActive = false;
         
-        this.confetti = new ConfettiEffect();
         this.statsManager = new StatsManager();
         
         this.init();
@@ -160,11 +84,6 @@ class SudokuGame {
         this.setupKeyboardNavigation();
         this.loadDarkMode();
         this.newGame();
-        
-        // Page load animation
-        setTimeout(() => {
-            document.body.classList.add('loaded');
-        }, 100);
     }
 
     setupEventListeners() {
@@ -869,7 +788,6 @@ class SudokuGame {
             this.gameActive = false;
             this.statsManager.recordGameComplete(Math.floor(this.elapsedTime / 1000));
             this.showMessage('🎉 Congratulations! You solved it!', 'success');
-            this.confetti.launch();
             
             setTimeout(() => {
                 this.showStatsModal();
