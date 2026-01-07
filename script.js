@@ -15,13 +15,14 @@ class ConfettiEffect {
     }
 
     createParticle() {
+        const colors = ['#667eea', '#764ba2', '#f093fb', '#10b981', '#f59e0b', '#ef4444'];
         return {
             x: Math.random() * this.canvas.width,
             y: -10,
             size: Math.random() * 8 + 4,
             speedY: Math.random() * 3 + 2,
             speedX: Math.random() * 2 - 1,
-            color: ['#667eea', '#764ba2', '#f093fb', '#10b981', '#f59e0b', '#ef4444'][Math.floor(Math.random() * 6)],
+            color: colors[Math.floor(Math.random() * colors.length)],
             rotation: Math.random() * 360,
             rotationSpeed: Math.random() * 10 - 5
         };
@@ -29,7 +30,8 @@ class ConfettiEffect {
 
     launch() {
         this.particles = [];
-        for (let i = 0; i < 150; i++) {
+        const numParticles = 150;
+        for (let i = 0; i < numParticles; i++) {
             setTimeout(() => {
                 this.particles.push(this.createParticle());
             }, i * 10);
@@ -585,6 +587,8 @@ class SudokuGame {
     }
 
     showHint() {
+        const HINT_PENALTY = 5;
+        
         if (!this.selectedCell) {
             // Find a random empty cell
             const emptyCells = [];
@@ -618,11 +622,11 @@ class SudokuGame {
         }
         
         this.board[row][col] = this.solution[row][col];
-        this.moves += 5; // Penalty for using hint
+        this.moves += HINT_PENALTY;
         this.updateMoveCounter();
         this.updateProgress();
         this.renderBoard();
-        this.showMessage('Hint used! (+5 moves penalty) 💡', 'success');
+        this.showMessage(`Hint used! (+${HINT_PENALTY} moves penalty) 💡`, 'success');
     }
 
     addToHistory(action, row, col, memosCopy, previousValue) {
