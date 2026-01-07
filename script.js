@@ -1,3 +1,132 @@
+// Confetti Animation
+class ConfettiEffect {
+    constructor() {
+        this.canvas = document.getElementById('confetti-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.particles = [];
+        this.animationId = null;
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    resize() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+    }
+
+    createParticle() {
+        const colors = ['#667eea', '#764ba2', '#f093fb', '#10b981', '#f59e0b', '#ef4444'];
+        return {
+            x: Math.random() * this.canvas.width,
+            y: -10,
+            size: Math.random() * 8 + 4,
+            speedY: Math.random() * 3 + 2,
+            speedX: Math.random() * 2 - 1,
+            color: colors[Math.floor(Math.random() * colors.length)],
+            rotation: Math.random() * 360,
+            rotationSpeed: Math.random() * 10 - 5
+        };
+    }
+
+    launch() {
+        this.particles = [];
+        const numParticles = 150;
+        for (let i = 0; i < numParticles; i++) {
+            setTimeout(() => {
+                this.particles.push(this.createParticle());
+            }, i * 10);
+        }
+        this.animate();
+    }
+
+    animate() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        this.particles.forEach((particle, index) => {
+            particle.y += particle.speedY;
+            particle.x += particle.speedX;
+            particle.rotation += particle.rotationSpeed;
+            
+            this.ctx.save();
+            this.ctx.translate(particle.x, particle.y);
+            this.ctx.rotate((particle.rotation * Math.PI) / 180);
+            this.ctx.fillStyle = particle.color;
+            this.ctx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+            this.ctx.restore();
+            
+            if (particle.y > this.canvas.height) {
+                this.particles.splice(index, 1);
+            }
+        });
+        
+        if (this.particles.length > 0) {
+            this.animationId = requestAnimationFrame(() => this.animate());
+        }
+    }
+
+    stop() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.particles = [];
+        }
+    }
+}
+
+// Statistics Manager
+class StatsManager {
+    constructor() {
+        this.stats = this.loadStats();
+    }
+
+    loadStats() {
+        const stored = localStorage.getItem('sudoku-stats');
+        return stored ? JSON.parse(stored) : {
+            gamesPlayed: 0,
+            gamesCompleted: 0,
+            bestTime: null,
+            totalTime: 0
+        };
+    }
+
+    saveStats() {
+        localStorage.setItem('sudoku-stats', JSON.stringify(this.stats));
+    }
+
+    recordGameStart() {
+        this.stats.gamesPlayed++;
+        this.saveStats();
+    }
+
+    recordGameComplete(time) {
+        this.stats.gamesCompleted++;
+        this.stats.totalTime += time;
+        if (!this.stats.bestTime || time < this.stats.bestTime) {
+            this.stats.bestTime = time;
+        }
+        this.saveStats();
+    }
+
+    getStats() {
+        return {
+            ...this.stats,
+            winRate: this.stats.gamesPlayed > 0 
+                ? Math.round((this.stats.gamesCompleted / this.stats.gamesPlayed) * 100) 
+                : 0
+        };
+    }
+
+    reset() {
+        this.stats = {
+            gamesPlayed: 0,
+            gamesCompleted: 0,
+            bestTime: null,
+            totalTime: 0
+        };
+        this.saveStats();
+    }
+}
+
 // Sudoku Game Logic
 class SudokuGame {
     constructor() {
@@ -10,6 +139,15 @@ class SudokuGame {
         this.memoMode = false;
         this.history = [];
         this.maxHistory = 50;
+        this.moves = 0;
+        this.timerInterval = null;
+        this.startTime = null;
+        this.elapsedTime = 0;
+        this.gameActive = false;
+        
+        this.confetti = new ConfettiEffect();
+        this.statsManager = new StatsManager();
+        
         this.init();
     }
 
@@ -19,18 +157,49 @@ class SudokuGame {
 
     init() {
         this.setupEventListeners();
+        this.setupKeyboardNavigation();
+        this.loadDarkMode();
         this.newGame();
+        
+        // Page load animation
+        setTimeout(() => {
+            document.body.classList.add('loaded');
+        }, 100);
     }
 
     setupEventListeners() {
         document.getElementById('newGame').addEventListener('click', () => this.newGame());
         document.getElementById('checkSolution').addEventListener('click', () => this.checkSolution());
-        document.getElementById('solve').addEventListener('click', () => this.showSolution());
         document.getElementById('difficulty').addEventListener('change', (e) => {
             this.difficulty = e.target.value;
         });
         document.getElementById('undoBtn').addEventListener('click', () => this.undo());
         document.getElementById('memoToggle').addEventListener('click', () => this.toggleMemoMode());
+        document.getElementById('hintBtn').addEventListener('click', () => this.showHint());
+        
+        // Dark mode toggle
+        document.getElementById('darkModeToggle').addEventListener('click', () => this.toggleDarkMode());
+        
+        // Modal controls
+        document.getElementById('howToPlayBtn').addEventListener('click', () => this.showModal('howToPlayModal'));
+        document.getElementById('statsBtn').addEventListener('click', () => this.showStatsModal());
+        
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.target.closest('.modal').classList.remove('show');
+            });
+        });
+        
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('show');
+                }
+            });
+        });
+        
+        // Share button
+        document.getElementById('shareBtn').addEventListener('click', () => this.shareAchievement());
         
         // Number pad event listeners
         for (let i = 1; i <= 9; i++) {
@@ -39,13 +208,160 @@ class SudokuGame {
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCell());
     }
 
+    setupKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            if (document.querySelector('.modal.show')) return;
+            
+            // Number input
+            if (e.key >= '1' && e.key <= '9') {
+                this.inputNumber(parseInt(e.key));
+                e.preventDefault();
+            }
+            
+            // Clear cell
+            if (e.key === 'Backspace' || e.key === 'Delete') {
+                this.clearCell();
+                e.preventDefault();
+            }
+            
+            // Arrow key navigation
+            if (this.selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                e.preventDefault();
+                let { row, col } = this.selectedCell;
+                
+                switch (e.key) {
+                    case 'ArrowUp': row = Math.max(0, row - 1); break;
+                    case 'ArrowDown': row = Math.min(8, row + 1); break;
+                    case 'ArrowLeft': col = Math.max(0, col - 1); break;
+                    case 'ArrowRight': col = Math.min(8, col + 1); break;
+                }
+                
+                this.selectCell(row, col);
+            }
+            
+            // Toggle memo mode
+            if (e.key === 'm' || e.key === 'M') {
+                this.toggleMemoMode();
+                e.preventDefault();
+            }
+        });
+    }
+
+    toggleDarkMode() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        
+        const icon = document.querySelector('#darkModeToggle .icon');
+        icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    loadDarkMode() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        const icon = document.querySelector('#darkModeToggle .icon');
+        icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    }
+
+    showModal(modalId) {
+        document.getElementById(modalId).classList.add('show');
+    }
+
+    showStatsModal() {
+        const stats = this.statsManager.getStats();
+        document.getElementById('gamesPlayed').textContent = stats.gamesPlayed;
+        document.getElementById('gamesCompleted').textContent = stats.gamesCompleted;
+        document.getElementById('bestTime').textContent = stats.bestTime 
+            ? this.formatTime(stats.bestTime) 
+            : '--:--';
+        document.getElementById('winRate').textContent = stats.winRate + '%';
+        this.showModal('statsModal');
+    }
+
+    shareAchievement() {
+        const stats = this.statsManager.getStats();
+        const text = `🎮 I've completed ${stats.gamesCompleted} Sudoku puzzles! Best time: ${
+            stats.bestTime ? this.formatTime(stats.bestTime) : 'N/A'
+        } ⏱️ #Sudoku`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'My Sudoku Achievement',
+                text: text,
+                url: window.location.href
+            }).catch(() => {});
+        } else {
+            navigator.clipboard.writeText(text).then(() => {
+                this.showMessage('Achievement copied to clipboard! 📋', 'success');
+            });
+        }
+    }
+
+    startTimer() {
+        this.startTime = Date.now() - this.elapsedTime;
+        this.timerInterval = setInterval(() => {
+            this.elapsedTime = Date.now() - this.startTime;
+            this.updateTimerDisplay();
+        }, 1000);
+    }
+
+    stopTimer() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
+
+    resetTimer() {
+        this.stopTimer();
+        this.elapsedTime = 0;
+        this.updateTimerDisplay();
+    }
+
+    updateTimerDisplay() {
+        const seconds = Math.floor(this.elapsedTime / 1000);
+        document.getElementById('timer').textContent = this.formatTime(seconds);
+    }
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    updateMoveCounter() {
+        document.getElementById('moveCounter').textContent = this.moves;
+    }
+
+    updateProgress() {
+        let filledCells = 0;
+        for (let row = 0; row < 9; row++) {
+            for (let col = 0; col < 9; col++) {
+                if (this.board[row][col] !== 0) {
+                    filledCells++;
+                }
+            }
+        }
+        const percentage = Math.round((filledCells / 81) * 100);
+        document.getElementById('progressFill').style.width = percentage + '%';
+        document.getElementById('progressText').textContent = percentage + '%';
+    }
+
     newGame() {
         this.generateSudoku();
         this.memos = this.initializeMemos();
         this.selectedCell = null;
         this.history = [];
+        this.moves = 0;
+        this.resetTimer();
+        this.gameActive = true;
         this.renderBoard();
         this.showMessage('');
+        this.updateMoveCounter();
+        this.updateProgress();
+        this.startTimer();
+        this.statsManager.recordGameStart();
     }
 
     generateSudoku() {
@@ -144,6 +460,9 @@ class SudokuGame {
                 cell.className = 'cell';
                 cell.dataset.row = row;
                 cell.dataset.col = col;
+                cell.setAttribute('role', 'gridcell');
+                cell.setAttribute('tabindex', '0');
+                cell.setAttribute('aria-label', `Row ${row + 1}, Column ${col + 1}`);
                 
                 if (this.prefilled[row][col]) {
                     cell.classList.add('prefilled');
@@ -188,11 +507,6 @@ class SudokuGame {
     }
 
     selectCell(row, col) {
-        // Don't allow selecting prefilled cells
-        if (this.prefilled[row][col]) {
-            return;
-        }
-        
         this.selectedCell = { row, col };
         this.renderBoard();
     }
@@ -218,23 +532,27 @@ class SudokuGame {
             } else {
                 this.memos[row][col].add(num);
             }
+            this.moves++;
         } else {
             // Regular number input
             this.addToHistory('number', row, col, new Set(this.memos[row][col]), this.board[row][col]);
             
             this.board[row][col] = num;
             this.memos[row][col].clear();
+            this.moves++;
             
             // Instant validation
             if (this.solution[row][col] === num) {
                 // Correct! Auto-clear memos
                 this.autoClearMemos(row, col, num);
-                this.showMessage('Correct!', 'success');
+                this.showMessage('Correct! ✓', 'success');
             } else {
-                this.showMessage('Incorrect - try again', 'error');
+                this.showMessage('Try again', 'error');
             }
         }
         
+        this.updateMoveCounter();
+        this.updateProgress();
         this.renderBoard();
     }
 
@@ -254,14 +572,61 @@ class SudokuGame {
         
         this.board[row][col] = 0;
         this.memos[row][col].clear();
+        this.moves++;
+        this.updateMoveCounter();
+        this.updateProgress();
         this.renderBoard();
     }
 
     toggleMemoMode() {
         this.memoMode = !this.memoMode;
         const button = document.getElementById('memoToggle');
-        button.textContent = this.memoMode ? 'Mode: Memo' : 'Mode: Normal';
+        const text = document.getElementById('memoText');
+        text.textContent = this.memoMode ? 'Memo' : 'Normal';
         button.classList.toggle('active', this.memoMode);
+    }
+
+    showHint() {
+        const HINT_PENALTY = 5;
+        
+        if (!this.selectedCell) {
+            // Find a random empty cell
+            const emptyCells = [];
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (!this.prefilled[row][col] && this.board[row][col] === 0) {
+                        emptyCells.push({ row, col });
+                    }
+                }
+            }
+            
+            if (emptyCells.length === 0) {
+                this.showMessage('No empty cells!', 'error');
+                return;
+            }
+            
+            const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+            this.selectedCell = randomCell;
+        }
+        
+        const { row, col } = this.selectedCell;
+        
+        if (this.prefilled[row][col]) {
+            this.showMessage('This cell is already filled!', 'error');
+            return;
+        }
+        
+        if (this.board[row][col] !== 0) {
+            this.showMessage('Clear the cell first for a hint!', 'error');
+            return;
+        }
+        
+        this.board[row][col] = this.solution[row][col];
+        this.moves += HINT_PENALTY;
+        this.updateMoveCounter();
+        this.updateProgress();
+        this.renderBoard();
+        this.showMessage(`Hint used! (+${HINT_PENALTY} moves penalty) 💡`, 'success');
     }
 
     addToHistory(action, row, col, memosCopy, previousValue) {
@@ -290,9 +655,12 @@ class SudokuGame {
         
         this.board[row][col] = value;
         this.memos[row][col] = memos;
+        this.moves = Math.max(0, this.moves - 1);
         
+        this.updateMoveCounter();
+        this.updateProgress();
         this.renderBoard();
-        this.showMessage('Undo successful', 'success');
+        this.showMessage('Undone ↶', 'success');
     }
 
     autoClearMemos(row, col, num) {
@@ -432,14 +800,16 @@ class SudokuGame {
         if (hasErrors) {
             this.showMessage('Some numbers are incorrect. Try again!', 'error');
         } else {
+            this.stopTimer();
+            this.gameActive = false;
+            this.statsManager.recordGameComplete(Math.floor(this.elapsedTime / 1000));
             this.showMessage('🎉 Congratulations! You solved it!', 'success');
+            this.confetti.launch();
+            
+            setTimeout(() => {
+                this.showStatsModal();
+            }, 2000);
         }
-    }
-
-    showSolution() {
-        this.board = this.solution.map(row => [...row]);
-        this.renderBoard();
-        this.showMessage('Solution revealed!', 'success');
     }
 
     showMessage(text, type = '') {
