@@ -200,7 +200,10 @@ class SudokuGame {
         if (modalCloseButtons.length > 0) {
             modalCloseButtons.forEach(btn => {
                 btn.addEventListener('click', (e) => {
-                    e.target.closest('.modal').classList.remove('show');
+                    const modal = e.target.closest('.modal');
+                    if (modal) {
+                        modal.classList.remove('show');
+                    }
                 });
             });
         } else {
