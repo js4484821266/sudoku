@@ -168,44 +168,70 @@ class SudokuGame {
     }
 
     setupEventListeners() {
-        document.getElementById('newGame').addEventListener('click', () => this.newGame());
-        document.getElementById('checkSolution').addEventListener('click', () => this.checkSolution());
-        document.getElementById('difficulty').addEventListener('change', (e) => {
+        // Helper function to safely add event listener
+        const safeAddEventListener = (elementId, event, handler) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Element with id '${elementId}' not found. Event listener not attached.`);
+            }
+        };
+        
+        // Game controls
+        safeAddEventListener('newGame', 'click', () => this.newGame());
+        safeAddEventListener('checkSolution', 'click', () => this.checkSolution());
+        safeAddEventListener('difficulty', 'change', (e) => {
             this.difficulty = e.target.value;
         });
-        document.getElementById('undoBtn').addEventListener('click', () => this.undo());
-        document.getElementById('memoToggle').addEventListener('click', () => this.toggleMemoMode());
-        document.getElementById('hintBtn').addEventListener('click', () => this.showHint());
+        safeAddEventListener('undoBtn', 'click', () => this.undo());
+        safeAddEventListener('memoToggle', 'click', () => this.toggleMemoMode());
+        safeAddEventListener('hintBtn', 'click', () => this.showHint());
         
         // Dark mode toggle
-        document.getElementById('darkModeToggle').addEventListener('click', () => this.toggleDarkMode());
+        safeAddEventListener('darkModeToggle', 'click', () => this.toggleDarkMode());
         
         // Modal controls
-        document.getElementById('howToPlayBtn').addEventListener('click', () => this.showModal('howToPlayModal'));
-        document.getElementById('statsBtn').addEventListener('click', () => this.showStatsModal());
+        safeAddEventListener('howToPlayBtn', 'click', () => this.showModal('howToPlayModal'));
+        safeAddEventListener('statsBtn', 'click', () => this.showStatsModal());
         
-        document.querySelectorAll('.modal-close').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.target.closest('.modal').classList.remove('show');
+        // Modal close buttons
+        const modalCloseButtons = document.querySelectorAll('.modal-close');
+        if (modalCloseButtons.length > 0) {
+            modalCloseButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const modal = e.target.closest('.modal');
+                    if (modal) {
+                        modal.classList.remove('show');
+                    }
+                });
             });
-        });
+        } else {
+            console.warn('No modal close buttons found.');
+        }
         
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('show');
-                }
+        // Modal background click handlers
+        const modals = document.querySelectorAll('.modal');
+        if (modals.length > 0) {
+            modals.forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('show');
+                    }
+                });
             });
-        });
+        } else {
+            console.warn('No modal elements found.');
+        }
         
         // Share button
-        document.getElementById('shareBtn').addEventListener('click', () => this.shareAchievement());
+        safeAddEventListener('shareBtn', 'click', () => this.shareAchievement());
         
         // Number pad event listeners
         for (let i = 1; i <= 9; i++) {
-            document.getElementById(`num${i}`).addEventListener('click', () => this.inputNumber(i));
+            safeAddEventListener(`num${i}`, 'click', () => this.inputNumber(i));
         }
-        document.getElementById('clearBtn').addEventListener('click', () => this.clearCell());
+        safeAddEventListener('clearBtn', 'click', () => this.clearCell());
     }
 
     setupKeyboardNavigation() {
@@ -254,28 +280,67 @@ class SudokuGame {
         localStorage.setItem('theme', newTheme);
         
         const icon = document.querySelector('#darkModeToggle .icon');
-        icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        if (icon) {
+            icon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        } else {
+            console.warn('Dark mode toggle icon not found.');
+        }
     }
 
     loadDarkMode() {
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
         const icon = document.querySelector('#darkModeToggle .icon');
-        icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        if (icon) {
+            icon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        } else {
+            console.warn('Dark mode toggle icon not found.');
+        }
     }
 
     showModal(modalId) {
-        document.getElementById(modalId).classList.add('show');
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.add('show');
+        } else {
+            console.warn(`Modal with id '${modalId}' not found.`);
+        }
     }
 
     showStatsModal() {
         const stats = this.statsManager.getStats();
-        document.getElementById('gamesPlayed').textContent = stats.gamesPlayed;
-        document.getElementById('gamesCompleted').textContent = stats.gamesCompleted;
-        document.getElementById('bestTime').textContent = stats.bestTime 
-            ? this.formatTime(stats.bestTime) 
-            : '--:--';
-        document.getElementById('winRate').textContent = stats.winRate + '%';
+        
+        const gamesPlayedEl = document.getElementById('gamesPlayed');
+        const gamesCompletedEl = document.getElementById('gamesCompleted');
+        const bestTimeEl = document.getElementById('bestTime');
+        const winRateEl = document.getElementById('winRate');
+        
+        if (gamesPlayedEl) {
+            gamesPlayedEl.textContent = stats.gamesPlayed;
+        } else {
+            console.warn('Element with id "gamesPlayed" not found.');
+        }
+        
+        if (gamesCompletedEl) {
+            gamesCompletedEl.textContent = stats.gamesCompleted;
+        } else {
+            console.warn('Element with id "gamesCompleted" not found.');
+        }
+        
+        if (bestTimeEl) {
+            bestTimeEl.textContent = stats.bestTime 
+                ? this.formatTime(stats.bestTime) 
+                : '--:--';
+        } else {
+            console.warn('Element with id "bestTime" not found.');
+        }
+        
+        if (winRateEl) {
+            winRateEl.textContent = stats.winRate + '%';
+        } else {
+            console.warn('Element with id "winRate" not found.');
+        }
+        
         this.showModal('statsModal');
     }
 
